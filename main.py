@@ -1,10 +1,4 @@
-from tkinter import E
-from docutil import DocUtil
-import os
-import subprocess
-from time import sleep
-from InputExecutor import InputExecutor, EMULATORARGS
-import sys
+from pydoc import Doc
 from time import sleep
 import re
 
@@ -12,16 +6,20 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.chrome.options import Options
 
-customerNumber = "12345"
+from docutil import DocUtil
+from datetime import date
 
-pin = "12345"
-password = "12345"
+customerNumber = "123"
+
+pin = "123"
+password = "123"
 TIMEOUT_DURATION = 3
+EXPENDITURE_SAVE_LOCATION = r"D:\FILES\Desktop\other\Expenditure analysis\Analysis\2022\Expenditure arrivals"
 
 
+SEARCH_FROM_DATE = "01/01/2022"
+SEARCH_TO_DATE = date.today().strftime("%d/%m/%Y")
 
 
 def PullAuthentificationCharacters(browser):
@@ -35,8 +33,6 @@ def PullAuthentificationCharacters(browser):
         index = int(re.sub("[^0-9]", "", lab.text))
         requiredIndices.append(index)
     return requiredIndices
-
-
 
 def BypassAuthentification(browser):
     print("Bypassing authentification...")
@@ -60,88 +56,72 @@ def BypassAuthentification(browser):
     sleep(2)
     WebDriverWait(browser, TIMEOUT_DURATION).until(EC.element_to_be_clickable((By.XPATH,'//*[@id="ctl00_mainContent_next_text_button_button"]'))).click()
 
-    
+
+
+def PullStatements(browser):
+    print("Pulling statements...")
+    browser.switch_to.default_content()
+    WebDriverWait(browser, TIMEOUT_DURATION).until(EC.frame_to_be_available_and_switch_to_it((By.XPATH,'//*[@id="ctl00_secframe"]')))
+
+    try:
+        # click the statements hub
+        [button for button in browser.find_elements_by_css_selector("a") if button.text.lower() == "statements"][0].click()
+
+        # click the download statements button
+        WebDriverWait(browser, TIMEOUT_DURATION).until(EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_mainContent_SS1AALDAnchor"]'))).click()
+
+        # choose date span
+        WebDriverWait(browser, TIMEOUT_DURATION).until(EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_mainContent_SS6NLAAnchor"]'))).click()
 
 
 
-def ProcessCard(browser, cardLink):
-    # navigate to the card.
-    cardLink.click()
+        SEARCH_FROM_DATE_LST = SEARCH_FROM_DATE.split("/")
 
-    # click export 
-    WebDriverWait(browser, TIMEOUT_DURATION).until(EC.element_to_be_clickable((By.CSS_SELECTOR,"#ctl00_mainContent_VT2ITCHF"))).click()
+        # configure DATE ONE
+        browser.execute_script("arguments[0].setAttribute('value'," + SEARCH_FROM_DATE_LST[0] + ")", browser.find_element_by_xpath('//*[@id="ctl00_mainContent_SS6DEA_day"]'))
+        browser.execute_script("arguments[0].setAttribute('value'," + SEARCH_FROM_DATE_LST[1] + ")", browser.find_element_by_xpath('//*[@id="ctl00_mainContent_SS6DEA_month"]/option[2]'))
+        browser.execute_script("arguments[0].setAttribute('value'," + SEARCH_FROM_DATE_LST[2] + ")", browser.find_element_by_xpath('//*[@id="ctl00_mainContent_SS6DEA_year"]/option[1]'))
 
-    # click export to csv
-    WebDriverWait(browser, TIMEOUT_DURATION).until(EC.element_to_be_clickable((By.XPATH,'//*[@id="ctl00_mainContent_VTSDDDA"]/option[1]'))).click()
+        SEARCH_TO_DATE_LST = SEARCH_TO_DATE.split("/")
 
-    # click download
-    WebDriverWait(browser, TIMEOUT_DURATION).until(EC.element_to_be_clickable((By.XPATH,'//*[@id="ctl00_mainContent_SS7-LWLA_button_button"]'))).click()
+        # configure DATE TWO
+        browser.execute_script("arguments[0].setAttribute('value'," + SEARCH_TO_DATE_LST[0] + ")", browser.find_element_by_xpath('//*[@id="ctl00_mainContent_SS6DEB_day"]'))
+        browser.execute_script("arguments[0].setAttribute('value'," + SEARCH_TO_DATE_LST[1] + ")", browser.find_element_by_xpath('//*[@id="ctl00_mainContent_SS6DEB_month"]/option[1]'))
+        browser.execute_script("arguments[0].setAttribute('value'," + SEARCH_TO_DATE_LST[2] + ")", browser.find_element_by_xpath('//*[@id="ctl00_mainContent_SS6DEB_year"]/option[1]'))
 
-    # wait for download to initiate
-    sleep(1)
+        # click download
+        browser.find_element_by_xpath('//*[@id="ctl00_mainContent_FinishButton_button"]').click()
 
+        # click export
+        WebDriverWait(browser, TIMEOUT_DURATION).until(EC.presence_of_element_located((By.XPATH, '//*[@id="ctl00_mainContent_SS7-LWLA_button_button"]'))).click()
 
-
-
-    
-def PullAllCards(browser):
-
-    # wait until all cards on central hub have loaded.
-    WebDriverWait(browser, TIMEOUT_DURATION).until(EC.visibility_of_element_located((By.CSS_SELECTOR, 'div.cardContent')))
-
-    # pull the links to the transaction page to each card
-    numCards = len([card for card in browser.find_elements_by_css_selector("div.cardContent a") if card.text.lower() == "view transactions"])
-    print("Found " + str(numCards) + " cards...")
-
-    # iterate through each card.
-    for i in range(0, numCards):
-        # wait for the link to be clickable.
-        WebDriverWait(browser, TIMEOUT_DURATION).until(EC.element_to_be_clickable((By.CSS_SELECTOR,"div.cardContent a")))
-        # process the card
-        ProcessCard(browser, [card for card in browser.find_elements_by_css_selector("div.cardContent a") if card.text.lower() == "view transactions"][i])
-
-        # come back to the central hub.
-        WebDriverWait(browser, TIMEOUT_DURATION).until(EC.element_to_be_clickable((By.XPATH,'//*[@id="ctl00_menu__fffd5cd41206055f_AS1MNUAnchor"]'))).click()
-
-
-        
-
-    
-
-
-
-
+    except Exception as e:
+        print(e)
+ 
 
 
 
 def launch():
-    # launch browser
 
  
     print("Configuring browser options...")
     options = webdriver.ChromeOptions()
     options.add_argument("--start-maximized")
-    options.add_argument("user-data-dir=C:\\Users\\jasbi\\AppData\\Local\\Google\\Chrome\\User Data\\Default")
-    options.add_experimental_option("prefs",{"download.default_directory" : r"D:\FILES\Desktop\Expenditure analysis\Expenditure Updater Script"})
+
+    chromeProfileLocation = r"C:\Users\jasbi\AppData\Local\Google\Chrome\User Data\Default"
+
+    options.add_argument("user-data-dir="+chromeProfileLocation)
+    options.add_experimental_option("prefs",{"download.default_directory" : EXPENDITURE_SAVE_LOCATION})
 
     print("Launching browser...")
-    browser = webdriver.Chrome(r"D:\FILES\Desktop\Expenditure analysis\chromedriver.exe", chrome_options=options)
+    browser = webdriver.Chrome(r"D:\FILES\Desktop\other\Expenditure analysis\chromedriver.exe", chrome_options=options)
 
     print("Redirecting to Natwest...")
     browser.get('https://www.onlinebanking.natwest.com/Default.aspx')
    
-
     try:
         # all of the inputs are in a <frame> tag. switch the reference frame of the browser to that frame.
         WebDriverWait(browser, TIMEOUT_DURATION).until(EC.frame_to_be_available_and_switch_to_it((By.XPATH,"//*[@id=\"ctl00_secframe\"]")))
-
-        try:
-            pass
-            # accept the cookies popup.
-            # WebDriverWait(browser, TIMEOUT_DURATION).until(EC.element_to_be_clickable((By.XPATH,'//*[@id="onetrust-accept-btn-handler"]'))).click()
-        except(Exception):
-            pass
-        
 
         # type in the customer number into the input tag.
         WebDriverWait(browser, TIMEOUT_DURATION).until(EC.visibility_of_element_located((By.XPATH, '//*[@id="ctl00_mainContent_LI5TABA_CustomerNumber_edit"]'))).send_keys(customerNumber)
@@ -153,53 +133,26 @@ def launch():
         BypassAuthentification(browser)
 
         # now we are onto the online banking central hub.
-        # find all <a> tags with text "view transactions"
-        PullAllCards(browser)
-
-        
+        PullStatements(browser)
         
     except Exception as e:
+        browser.quit()
         print(e)
 
 
-
     while True:
-        continue
+        i = 3
+    return True
+  
 
-    
+while True:
+    try:
+        DocUtil.DeleteFolder(EXPENDITURE_SAVE_LOCATION)
+    except(Exception):
+        pass
+    DocUtil.CreateFolderAbsoluteDirectory(EXPENDITURE_SAVE_LOCATION)
+  
+    if launch():
+        break
 
-launch()
-
-
-
-
-
-
-
-
-
-
-
-
-# # navigate to authentification
-# # need a way to pull the required characters.
-#     # save the html
-#     # run html through authenticator script
-#         # returns the 6 required characters.
-
-
-
-# def PullRequiredPinDigits():
-#     pass
-
-# def PullRequiredPasswordCharacters():
-#     pass
-
-# requiredPinDigits = []
-# requiredPasswordCharacters = []
-
-
-# logFile = r"D:\FILES\Desktop\Expenditure analysis\Expenditure Updater Script\filesaver.txt"
-# inputexecutor = InputExecutor()
-# inputexecutor.execute(logFile)
 
